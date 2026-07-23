@@ -2,12 +2,10 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: currency_quotes
-    environment:
-      POSTGRES_DB: ${DB_NAME}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    env_file:
+      - .env
     ports:
-      - ${DB_PORT}:${DB_PORT}
+      - ${POSTGRES_PORT}:${POSTGRES_PORT}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped

@@ -22,12 +22,12 @@ type HTTPServerConfig struct {
 }
 
 type PostgresConfig struct {
-	Host     string `env:"DB_HOST"`
-	Port     string `env:"DB_PORT"`
-	User     string `env:"DB_USER"`
-	Password string `env:"DB_PASSWORD"`
-	DBName   string `env:"DB_NAME"`
-	SSLMode  string `env:"DB_SSLMODE"`
+	Host     string `env:"POSTGRES_HOST"`
+	Port     string `env:"POSTGRES_PORT"`
+	User     string `env:"POSTGRES_USER"`
+	Password string `env:"POSTGRES_PASSWORD"`
+	DBName   string `env:"POSTGRES_NAME"`
+	SSLMode  string `env:"POSTGRES_SSLMODE"`
 }
 
 func New() (*Configuration, error) {
@@ -65,22 +65,22 @@ func (c *Configuration) validate() error {
 		errs = append(errs, errors.New("token: HTTP_SERVER_ADDRESS is required"))
 	}
 	if c.Postgres.Host == "" {
-		errs = append(errs, errors.New("postgres: DB_HOST is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_HOST is required"))
 	}
 	if c.Postgres.Port == "" {
-		errs = append(errs, errors.New("postgres: DB_PORT is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_PORT is required"))
 	}
 	if c.Postgres.User == "" {
-		errs = append(errs, errors.New("postgres: DB_USER is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_USER is required"))
 	}
 	if c.Postgres.Password == "" {
-		errs = append(errs, errors.New("postgres: DB_PASSWORD is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_PASSWORD is required"))
 	}
 	if c.Postgres.DBName == "" {
-		errs = append(errs, errors.New("postgres: DB_NAME is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_NAME is required"))
 	}
 	if c.Postgres.SSLMode == "" {
-		errs = append(errs, errors.New("postgres: DB_SSLMODE is required"))
+		errs = append(errs, errors.New("postgres: POSTGRES_SSLMODE is required"))
 	}
 
 	return errors.Join(errs...)
