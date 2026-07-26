@@ -42,3 +42,6 @@ temp/.env
 
 # Claude Code project context
 CLAUDE.md
+
+# Personal learning notes, not part of the deliverable
+NOTES.md
