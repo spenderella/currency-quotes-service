@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ydb-platform/ydb-go-sdk/v3/pkg/decimal"
+	"github.com/shopspring/decimal"
 )
 
 type Quote struct {
@@ -12,5 +12,6 @@ type Quote struct {
 	BaseCurrency  string
 	QuoteCurrency string
 	Rate          decimal.Decimal
+	Status        string
 	FetchedAt     time.Time
 }
