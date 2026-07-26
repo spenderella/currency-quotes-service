@@ -78,11 +78,11 @@ func (a *Application) Start(ctx context.Context) error {
 
 func (a *Application) Close(ctx context.Context) error {
 	errs := []error{}
-	if a.postgres != nil {
-		errs = append(errs, a.postgres.Close())
-	}
 	if a.httpServer != nil {
 		errs = append(errs, a.httpServer.Close(ctx))
+	}
+	if a.postgres != nil {
+		errs = append(errs, a.postgres.Close())
 	}
 	return errors.Join(errs...)
 }

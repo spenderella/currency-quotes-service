@@ -13,3 +13,6 @@ migrate-down:
 
 migrate-status:
 	goose postgres "$(DSN)" -dir $(MIGRATIONS_DIR) status
+
+run:
+	go run cmd/server/main.go
