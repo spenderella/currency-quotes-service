@@ -185,7 +185,8 @@ func (r *QuoteRepository) GetPendingQuoteUpdates(ctx context.Context) ([]domain.
         SELECT
 		id,
 		base_currency,
-		quote_currency
+		quote_currency,
+		status
 		FROM quote_updates
 		WHERE status = 'pending' OR status = 'in_progress'
 		ORDER BY created_at ASC
@@ -205,6 +206,7 @@ func (r *QuoteRepository) GetPendingQuoteUpdates(ctx context.Context) ([]domain.
 			&quote.ID,
 			&quote.BaseCurrency,
 			&quote.QuoteCurrency,
+			&quote.Status,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("repository: get pending quote update: %w", err)
