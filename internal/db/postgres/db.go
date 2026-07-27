@@ -13,7 +13,7 @@ import (
 // Connect establishes a connection to the PostgreSQL database using the given configuration.
 // It configures connection pool settings and verifies the connection with a ping.
 func Connect(cfg config.PostgresConfig) (*sql.DB, error) {
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s options='-c TimeZone=UTC'",
 		cfg.Host,
 		cfg.Port,
 		cfg.User,
