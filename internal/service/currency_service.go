@@ -34,3 +34,9 @@ func (s *CurrencyService) LoadCurrencies(ctx context.Context) error {
 
 	return nil
 }
+
+// IsSupported reports whether a currency code is in the enabled whitelist.
+func (s *CurrencyService) IsSupported(code string) bool {
+	_, ok := s.currencies[code]
+	return ok
+}
