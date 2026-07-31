@@ -130,19 +130,6 @@ func (r *QuoteRepository) GetQuoteUpdateLatest(ctx context.Context, baseCurrency
 	return row.toDomain(), nil
 }
 
-func (r *QuoteRepository) MarkInProgress(ctx context.Context, id uuid.UUID) error {
-	query := `
-        UPDATE quote_updates
-        SET status = 'in_progress', updated_at = now()
-        WHERE id = $1
-    `
-	res, err := r.db.ExecContext(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("repository: mark in progress: %w", err)
-	}
-	return checkRowsAffected(res, "mark in progress")
-}
-
 func (r *QuoteRepository) MarkDone(ctx context.Context, id uuid.UUID, rate decimal.Decimal, fetchedAt time.Time) error {
 	query := `
         UPDATE quote_updates
