@@ -180,7 +180,7 @@ func checkRowsAffected(res sql.Result, op string) error {
 	return nil
 }
 
-func (r *QuoteRepository) GetPendingQuoteUpdates(ctx context.Context) ([]domain.Quote, error) {
+func (r *QuoteRepository) GetUndoneQuoteUpdates(ctx context.Context) ([]domain.Quote, error) {
 	query := `
         SELECT
 		id,
@@ -216,6 +216,43 @@ func (r *QuoteRepository) GetPendingQuoteUpdates(ctx context.Context) ([]domain.
 	err = rows.Err()
 	if err != nil {
 		return nil, fmt.Errorf("repository: get pending quote updates: %w", err)
+	}
+
+	return updates, nil
+}
+
+func (r *QuoteRepository) ClaimPendingQuoteUpdates(ctx context.Context, limit int) ([]domain.Quote, error) {
+	query := `
+        UPDATE quote_updates
+        SET status = 'in_progress', updated_at = now()
+        WHERE id IN (
+            SELECT id
+            FROM quote_updates
+            WHERE status = 'pending'
+            ORDER BY created_at
+            LIMIT $1
+            FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, base_currency, quote_currency
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("repository: claim pending quote updates: %w", err)
+	}
+	defer rows.Close()
+
+	updates := []domain.Quote{}
+	for rows.Next() {
+		var quote domain.Quote
+		if err := rows.Scan(&quote.ID, &quote.BaseCurrency, &quote.QuoteCurrency); err != nil {
+			return nil, fmt.Errorf("repository: claim pending quote update: %w", err)
+		}
+		quote.Status = "in_progress"
+		updates = append(updates, quote)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: claim pending quote updates: %w", err)
 	}
 
 	return updates, nil

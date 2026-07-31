@@ -10,6 +10,7 @@ import (
 	httpserver "github.com/spenderella/currency-quotes-service/internal/api/http"
 	"github.com/spenderella/currency-quotes-service/internal/config"
 	"github.com/spenderella/currency-quotes-service/internal/db/postgres"
+	"github.com/spenderella/currency-quotes-service/internal/repository"
 )
 
 type Application struct {
@@ -17,6 +18,7 @@ type Application struct {
 	logger     *slog.Logger
 	httpServer *httpserver.Server
 	postgres   *sql.DB
+	quoteRepo  *repository.QuoteRepository
 }
 
 func New(ctx context.Context, logger *slog.Logger) (*Application, error) {
@@ -36,6 +38,10 @@ func New(ctx context.Context, logger *slog.Logger) (*Application, error) {
 
 	if err = app.setDatabase(app.conf.Postgres); err != nil {
 		return nil, fmt.Errorf("set database: %w", err)
+	}
+
+	if err = app.setRepositories(); err != nil {
+		return nil, fmt.Errorf("set repositories: %w", err)
 	}
 
 	if err = app.setServer(ctx, app.conf.HTTPServer); err != nil {
@@ -69,6 +75,11 @@ func (a *Application) setDatabase(conf config.PostgresConfig) error {
 		return fmt.Errorf("create postgres connection: %w", err)
 	}
 	a.postgres = postgresClient
+	return nil
+}
+
+func (a *Application) setRepositories() error {
+	a.quoteRepo = repository.NewQuoteRepository(a.postgres)
 	return nil
 }
 

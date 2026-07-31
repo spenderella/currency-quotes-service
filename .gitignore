@@ -45,3 +45,6 @@ CLAUDE.md
 
 # Personal learning notes, not part of the deliverable
 NOTES.md
+
+# Manual smoke-test scratch script, not part of the deliverable
+cmd/manualtest/
