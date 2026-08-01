@@ -6,14 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"time"
-
-	"github.com/shopspring/decimal"
 
 	httpserver "github.com/spenderella/currency-quotes-service/internal/api/http"
 	"github.com/spenderella/currency-quotes-service/internal/config"
 	"github.com/spenderella/currency-quotes-service/internal/db/postgres"
-	"github.com/spenderella/currency-quotes-service/internal/provider"
+	"github.com/spenderella/currency-quotes-service/internal/provider/frankfurter"
 	"github.com/spenderella/currency-quotes-service/internal/repository"
 	"github.com/spenderella/currency-quotes-service/internal/service"
 	"github.com/spenderella/currency-quotes-service/internal/worker"
@@ -109,8 +108,14 @@ func (a *Application) setServices(ctx context.Context) error {
 		return fmt.Errorf("load currencies: %w", err)
 	}
 
-	// TODO: temporary stand-in until the real frankfurter.dev client (internal/provider) is built.
-	ratesProvider := provider.Fixed{Rate: decimal.NewFromFloat(1)}
+	httpClient := &http.Client{Timeout: time.Duration(a.conf.Provider.TimeoutSeconds) * time.Second}
+	ratesProvider := frankfurter.NewProvider(
+		httpClient,
+		a.conf.Provider.BaseURL,
+		a.conf.Provider.Source,
+		a.conf.Provider.MaxRetries,
+		time.Duration(a.conf.Provider.RetryBaseDelayMS)*time.Millisecond,
+	)
 
 	a.quoteService = service.NewQuoteService(a.quoteRepo, a.currencyService, ratesProvider)
 	return nil

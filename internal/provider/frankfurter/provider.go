@@ -12,8 +12,8 @@ type Provider struct {
 	httpClient *http.Client
 	baseURL    string
 	providers  string
-	//maxRetries int
-	//baseDelay  time.Duration
+	maxRetries int
+	baseDelay  time.Duration
 }
 
 func NewProvider(httpClient *http.Client, baseURL, providers string, maxRetries int, baseDelay time.Duration) *Provider {
@@ -24,4 +24,10 @@ func NewProvider(httpClient *http.Client, baseURL, providers string, maxRetries 
 	}
 }
 
-func (p *Provider) GetRate(ctx context.Context, baseCurrency, quoteCurrency string) (decimal.Decimal, time.Time, error)
+func (p *Provider) GetRate(ctx context.Context, baseCurrency, quoteCurrency string) (decimal.Decimal, time.Time, error) {
+	resp, err := p.fetchRates(ctx, baseCurrency, quoteCurrency)
+	if err != nil {
+		return decimal.Decimal{}, time.Time{}, err
+	}
+	return resp.rate, resp.providerTime, nil
+}
