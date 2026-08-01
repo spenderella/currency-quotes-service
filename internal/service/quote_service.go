@@ -31,15 +31,22 @@ type ICurrencyService interface {
 	IsSupported(code string) bool
 }
 
+// IRatesProvider fetches the current rate for a currency pair from an external source.
+type IRatesProvider interface {
+	GetRate(ctx context.Context, baseCurrency, quoteCurrency string) (rate decimal.Decimal, fetchedAt time.Time, err error)
+}
+
 type QuoteService struct {
 	quoteRepo       IQuoteRepository
 	currencyService ICurrencyService
+	provider        IRatesProvider
 }
 
-func NewQuoteService(quoteRepo IQuoteRepository, currencyService ICurrencyService) *QuoteService {
+func NewQuoteService(quoteRepo IQuoteRepository, currencyService ICurrencyService, provider IRatesProvider) *QuoteService {
 	return &QuoteService{
 		quoteRepo:       quoteRepo,
 		currencyService: currencyService,
+		provider:        provider,
 	}
 }
 
@@ -91,12 +98,21 @@ func (s *QuoteService) ClaimPendingQuoteUpdates(ctx context.Context, limit int) 
 	return s.quoteRepo.ClaimPendingQuoteUpdates(ctx, limit)
 }
 
-func (s *QuoteService) RunWorkerPool(ctx context.Context, poolSize int) error {
-	panic("not implemented")
-}
-
 // RecoverPendingUpdates returns tasks left pending/in_progress after a crash,
 // for the caller to feed into the worker pool.
 func (s *QuoteService) RecoverPendingUpdates(ctx context.Context) ([]domain.Quote, error) {
 	return s.quoteRepo.GetUndoneQuoteUpdates(ctx)
+}
+
+// ProcessClaimedTask resolves an already-claimed task: fetches the rate from
+// the provider and persists the result.
+func (s *QuoteService) ProcessClaimedTask(ctx context.Context, task domain.Quote) error {
+	rate, fetchedAt, err := s.provider.GetRate(ctx, task.BaseCurrency, task.QuoteCurrency)
+	if err != nil {
+		if markErr := s.quoteRepo.MarkFailed(ctx, task.ID, err.Error()); markErr != nil {
+			return errors.Join(fmt.Errorf("get rate: %w", err), markErr)
+		}
+		return fmt.Errorf("get rate: %w", err)
+	}
+	return s.quoteRepo.MarkDone(ctx, task.ID, rate, fetchedAt)
 }
