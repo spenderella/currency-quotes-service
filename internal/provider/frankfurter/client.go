@@ -46,17 +46,21 @@ func (p *Provider) fetchRates(ctx context.Context, baseCurrency, quoteCurrency s
 
 	resp, err := p.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, &retryableError{err}
 	}
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("frankfurter: read response: %w", err)
+		return nil, &retryableError{fmt.Errorf("frankfurter: read response: %w", err)}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("frankfurter: unexpected status %d: %s", resp.StatusCode, data)
+		err := fmt.Errorf("frankfurter: unexpected status %d: %s", resp.StatusCode, data)
+		if resp.StatusCode >= http.StatusInternalServerError {
+			return nil, &retryableError{err}
+		}
+		return nil, err
 	}
 
 	var body []rateRecord
