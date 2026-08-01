@@ -14,6 +14,7 @@ type Configuration struct {
 	HTTPServer HTTPServerConfig
 	Postgres   PostgresConfig
 	Worker     WorkerConfig
+	Provider   ProviderConfig
 }
 
 type HTTPServerConfig struct {
@@ -35,6 +36,14 @@ type PostgresConfig struct {
 	Password string `env:"POSTGRES_PASSWORD"`
 	DBName   string `env:"POSTGRES_NAME"`
 	SSLMode  string `env:"POSTGRES_SSLMODE"`
+}
+
+type ProviderConfig struct {
+	BaseURL          string `env:"PROVIDER_BASE_URL"`
+	Source           string `env:"PROVIDER_SOURCE" envDefault:"BANXICO"`
+	TimeoutSeconds   uint   `env:"PROVIDER_TIMEOUT_SECONDS" envDefault:"5"`
+	MaxRetries       int    `env:"PROVIDER_MAX_RETRIES" envDefault:"3"`
+	RetryBaseDelayMS uint   `env:"PROVIDER_RETRY_BASE_DELAY_MS" envDefault:"200"`
 }
 
 func New() (*Configuration, error) {
@@ -97,6 +106,21 @@ func (c *Configuration) validate() error {
 	}
 	if c.Worker.TaskTimeoutSeconds == 0 {
 		errs = append(errs, errors.New("worker: WORKER_TASK_TIMEOUT_SECONDS must be > 0"))
+	}
+	if c.Provider.BaseURL == "" {
+		errs = append(errs, errors.New("provider: PROVIDER_BASE_URL is required"))
+	}
+	if c.Provider.Source == "" {
+		errs = append(errs, errors.New("provider: PROVIDER_SOURCE is required"))
+	}
+	if c.Provider.TimeoutSeconds == 0 {
+		errs = append(errs, errors.New("provider: PROVIDER_TIMEOUT_SECONDS must be > 0"))
+	}
+	if c.Provider.MaxRetries <= 0 {
+		errs = append(errs, errors.New("provider: PROVIDER_MAX_RETRIES must be > 0"))
+	}
+	if c.Provider.RetryBaseDelayMS == 0 {
+		errs = append(errs, errors.New("provider: PROVIDER_RETRY_BASE_DELAY_MS must be > 0"))
 	}
 
 	return errors.Join(errs...)

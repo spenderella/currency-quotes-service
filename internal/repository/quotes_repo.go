@@ -47,6 +47,7 @@ type quoteUpdateRow struct {
 	quoteCurrency string
 	rate          decimal.NullDecimal
 	status        string
+	providerTime  sql.Null[time.Time]
 	fetchedAt     sql.Null[time.Time]
 }
 
@@ -59,6 +60,9 @@ func (row quoteUpdateRow) toDomain() domain.Quote {
 	}
 	if row.rate.Valid {
 		quote.Rate = row.rate.Decimal
+	}
+	if row.providerTime.Valid {
+		quote.ProviderTime = row.providerTime.V
 	}
 	if row.fetchedAt.Valid {
 		quote.FetchedAt = row.fetchedAt.V
@@ -73,6 +77,7 @@ func (r *QuoteRepository) GetQuoteUpdateByID(ctx context.Context, id uuid.UUID) 
 		quote_currency,
 		rate,
 		status,
+		provider_time,
 		fetched_at
 		FROM quote_updates
 		WHERE id = $1
@@ -84,6 +89,7 @@ func (r *QuoteRepository) GetQuoteUpdateByID(ctx context.Context, id uuid.UUID) 
 		&row.quoteCurrency,
 		&row.rate,
 		&row.status,
+		&row.providerTime,
 		&row.fetchedAt,
 	)
 	if err != nil {
@@ -104,6 +110,7 @@ func (r *QuoteRepository) GetQuoteUpdateLatest(ctx context.Context, baseCurrency
 		quote_currency,
 		rate,
 		status,
+		provider_time,
 		fetched_at
 		FROM quote_updates
 		WHERE base_currency = $1 AND quote_currency = $2 AND status = 'done'
@@ -118,6 +125,7 @@ func (r *QuoteRepository) GetQuoteUpdateLatest(ctx context.Context, baseCurrency
 		&row.quoteCurrency,
 		&row.rate,
 		&row.status,
+		&row.providerTime,
 		&row.fetchedAt,
 	)
 	if err != nil {
@@ -130,13 +138,13 @@ func (r *QuoteRepository) GetQuoteUpdateLatest(ctx context.Context, baseCurrency
 	return row.toDomain(), nil
 }
 
-func (r *QuoteRepository) MarkDone(ctx context.Context, id uuid.UUID, rate decimal.Decimal, fetchedAt time.Time) error {
+func (r *QuoteRepository) MarkDone(ctx context.Context, id uuid.UUID, rate decimal.Decimal, providerTime, fetchedAt time.Time) error {
 	query := `
         UPDATE quote_updates
-        SET status = 'done', rate = $1, fetched_at = $2, updated_at = now()
-        WHERE id = $3
+        SET status = 'done', rate = $1, provider_time = $2, fetched_at = $3, updated_at = now()
+        WHERE id = $4
     `
-	res, err := r.db.ExecContext(ctx, query, rate, fetchedAt, id)
+	res, err := r.db.ExecContext(ctx, query, rate, providerTime, fetchedAt, id)
 	if err != nil {
 		return fmt.Errorf("repository: mark done: %w", err)
 	}

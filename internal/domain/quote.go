@@ -13,5 +13,6 @@ type Quote struct {
 	QuoteCurrency string
 	Rate          decimal.Decimal
 	Status        string
+	ProviderTime  time.Time
 	FetchedAt     time.Time
 }
