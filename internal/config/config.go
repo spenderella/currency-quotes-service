@@ -13,12 +13,19 @@ const configPath = ".env"
 type Configuration struct {
 	HTTPServer HTTPServerConfig
 	Postgres   PostgresConfig
+	Worker     WorkerConfig
 }
 
 type HTTPServerConfig struct {
 	Address             string `env:"HTTP_SERVER_ADDRESS"`
 	ReadTimeoutSeconds  uint   `env:"HTTP_SERVER_READ_TIMEOUT" envDefault:"30"`
 	WriteTimeoutSeconds uint   `env:"HTTP_SERVER_WRITE_TIMEOUT" envDefault:"30"`
+}
+
+type WorkerConfig struct {
+	PoolSize            int  `env:"WORKER_POOL_SIZE" envDefault:"4"`
+	TickIntervalSeconds uint `env:"WORKER_TICK_INTERVAL_SECONDS" envDefault:"5"`
+	TaskTimeoutSeconds  uint `env:"WORKER_TASK_TIMEOUT_SECONDS" envDefault:"10"`
 }
 
 type PostgresConfig struct {
@@ -81,6 +88,15 @@ func (c *Configuration) validate() error {
 	}
 	if c.Postgres.SSLMode == "" {
 		errs = append(errs, errors.New("postgres: POSTGRES_SSLMODE is required"))
+	}
+	if c.Worker.PoolSize <= 0 {
+		errs = append(errs, errors.New("worker: WORKER_POOL_SIZE must be > 0"))
+	}
+	if c.Worker.TickIntervalSeconds == 0 {
+		errs = append(errs, errors.New("worker: WORKER_TICK_INTERVAL_SECONDS must be > 0"))
+	}
+	if c.Worker.TaskTimeoutSeconds == 0 {
+		errs = append(errs, errors.New("worker: WORKER_TASK_TIMEOUT_SECONDS must be > 0"))
 	}
 
 	return errors.Join(errs...)

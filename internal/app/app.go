@@ -6,19 +6,30 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
+
+	"github.com/shopspring/decimal"
 
 	httpserver "github.com/spenderella/currency-quotes-service/internal/api/http"
 	"github.com/spenderella/currency-quotes-service/internal/config"
 	"github.com/spenderella/currency-quotes-service/internal/db/postgres"
+	"github.com/spenderella/currency-quotes-service/internal/provider"
 	"github.com/spenderella/currency-quotes-service/internal/repository"
+	"github.com/spenderella/currency-quotes-service/internal/service"
+	"github.com/spenderella/currency-quotes-service/internal/worker"
 )
 
 type Application struct {
-	conf       *config.Configuration
-	logger     *slog.Logger
-	httpServer *httpserver.Server
-	postgres   *sql.DB
-	quoteRepo  *repository.QuoteRepository
+	conf            *config.Configuration
+	logger          *slog.Logger
+	httpServer      *httpserver.Server
+	postgres        *sql.DB
+	quoteRepo       *repository.QuoteRepository
+	currencyRepo    *repository.CurrencyRepository
+	currencyService *service.CurrencyService
+	quoteService    *service.QuoteService
+	worker          *worker.Pool
+	workerErrCh     chan error
 }
 
 func New(ctx context.Context, logger *slog.Logger) (*Application, error) {
@@ -42,6 +53,14 @@ func New(ctx context.Context, logger *slog.Logger) (*Application, error) {
 
 	if err = app.setRepositories(); err != nil {
 		return nil, fmt.Errorf("set repositories: %w", err)
+	}
+
+	if err = app.setServices(ctx); err != nil {
+		return nil, fmt.Errorf("set services: %w", err)
+	}
+
+	if err = app.setWorker(app.conf.Worker); err != nil {
+		return nil, fmt.Errorf("set worker: %w", err)
 	}
 
 	if err = app.setServer(ctx, app.conf.HTTPServer); err != nil {
@@ -80,10 +99,40 @@ func (a *Application) setDatabase(conf config.PostgresConfig) error {
 
 func (a *Application) setRepositories() error {
 	a.quoteRepo = repository.NewQuoteRepository(a.postgres)
+	a.currencyRepo = repository.NewCurrencyRepository(a.postgres)
+	return nil
+}
+
+func (a *Application) setServices(ctx context.Context) error {
+	a.currencyService = service.NewCurrencyService(a.currencyRepo)
+	if err := a.currencyService.LoadCurrencies(ctx); err != nil {
+		return fmt.Errorf("load currencies: %w", err)
+	}
+
+	// TODO: temporary stand-in until the real frankfurter.dev client (internal/provider) is built.
+	ratesProvider := provider.Fixed{Rate: decimal.NewFromFloat(1)}
+
+	a.quoteService = service.NewQuoteService(a.quoteRepo, a.currencyService, ratesProvider)
+	return nil
+}
+
+func (a *Application) setWorker(conf config.WorkerConfig) error {
+	a.worker = worker.New(
+		a.quoteService,
+		a.logger,
+		conf.PoolSize,
+		time.Duration(conf.TickIntervalSeconds)*time.Second,
+		time.Duration(conf.TaskTimeoutSeconds)*time.Second,
+	)
 	return nil
 }
 
 func (a *Application) Start(ctx context.Context) error {
+	a.workerErrCh = make(chan error, 1)
+	go func() {
+		a.workerErrCh <- a.worker.Run(ctx)
+	}()
+
 	return a.httpServer.Start(ctx)
 }
 
@@ -91,6 +140,14 @@ func (a *Application) Close(ctx context.Context) error {
 	errs := []error{}
 	if a.httpServer != nil {
 		errs = append(errs, a.httpServer.Close(ctx))
+	}
+	if a.worker != nil && a.workerErrCh != nil {
+		select {
+		case err := <-a.workerErrCh:
+			errs = append(errs, err)
+		case <-ctx.Done():
+			errs = append(errs, fmt.Errorf("worker: %w", ctx.Err()))
+		}
 	}
 	if a.postgres != nil {
 		errs = append(errs, a.postgres.Close())
