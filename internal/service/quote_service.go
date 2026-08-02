@@ -17,6 +17,8 @@ import (
 var ErrUnsupportedCurrency = errors.New("service: unsupported currency")
 var ErrNotFound = errors.New("service: quote update not found")
 
+//go:generate mockgen -source=quote_service.go -destination=mocks/mock_quote_service.go -package=mocks
+
 type IQuoteRepository interface {
 	CreateQuoteUpdate(ctx context.Context, baseCurrency string, quoteCurrency string, idempotencyKey string) (id uuid.UUID, err error)
 	GetQuoteUpdateByID(ctx context.Context, id uuid.UUID) (domain.Quote, error)
