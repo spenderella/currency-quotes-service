@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+//go:generate mockgen -source=currency_service.go -destination=mocks/mock_currency_repository.go -package=mocks
+
 type ICurrencyRepository interface {
 	GetEnabledCurrencies(ctx context.Context) ([]string, error)
 }
