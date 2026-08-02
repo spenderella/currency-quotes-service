@@ -79,7 +79,7 @@ func (a *Application) setConfig() error {
 }
 
 func (a *Application) setServer(ctx context.Context, conf config.HTTPServerConfig) error {
-	srv, err := httpserver.New(ctx, conf, a.logger)
+	srv, err := httpserver.New(ctx, conf, a.quoteService, a.logger)
 	if err != nil {
 		return fmt.Errorf("create http server: %w", err)
 	}
