@@ -215,7 +215,9 @@ func TestQuoteService_ProcessClaimedTask_ProviderError_MarkFailedSucceeds(t *tes
 	providerErr := errors.New("provider timeout")
 
 	provider.EXPECT().GetRate(ctx, "EUR", "MXN").Return(decimal.Decimal{}, time.Time{}, providerErr)
-	quoteRepo.EXPECT().MarkFailed(ctx, task.ID, providerErr.Error()).Return(nil)
+	// MarkFailed gets its own context (see markFailedTimeout), deliberately not ctx itself —
+	// it must survive even when ctx is the thing that just expired.
+	quoteRepo.EXPECT().MarkFailed(gomock.Any(), task.ID, providerErr.Error()).Return(nil)
 
 	err := svc.ProcessClaimedTask(ctx, task)
 	require.ErrorIs(t, err, providerErr)
@@ -229,7 +231,7 @@ func TestQuoteService_ProcessClaimedTask_ProviderError_MarkFailedAlsoErrors(t *t
 	markErr := errors.New("db write failed")
 
 	provider.EXPECT().GetRate(ctx, "EUR", "MXN").Return(decimal.Decimal{}, time.Time{}, providerErr)
-	quoteRepo.EXPECT().MarkFailed(ctx, task.ID, providerErr.Error()).Return(markErr)
+	quoteRepo.EXPECT().MarkFailed(gomock.Any(), task.ID, providerErr.Error()).Return(markErr)
 
 	err := svc.ProcessClaimedTask(ctx, task)
 	require.ErrorIs(t, err, providerErr)

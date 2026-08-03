@@ -8,6 +8,28 @@ services:
       - ${POSTGRES_PORT}:${POSTGRES_PORT}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_NAME}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/spenderella/currency-quotes-service:1.0.1
+    build: .
+    container_name: currency_quotes_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # inside the compose network Postgres is reachable by service name, not localhost
+      - POSTGRES_HOST=postgres
+    volumes:
+      # config.New() reads .env as an actual file (godotenv), not just process env vars
+      - ./.env:/app/.env:ro
+    ports:
+      - "8080:8080"
     restart: unless-stopped
 
 volumes:
