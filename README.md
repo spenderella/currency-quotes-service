@@ -7,16 +7,48 @@ The service provides quotes with a precision of 6 decimal places.
 
 ## Running the project
 
-Prerequisites: Go 1.25+, Docker (for PostgreSQL), and the [goose](https://github.com/pressly/goose) CLI for migrations (`go install github.com/pressly/goose/v3/cmd/goose@latest`).
+There are two ways to run this project:
+
+1. **Developing** — prerequisites: Docker, Go 1.25+, goose.
+2. **Just running it** — prerequisites: Docker, goose.
+
+Migrations need the [goose](https://github.com/pressly/goose) CLI either way — either `go install github.com/pressly/goose/v3/cmd/goose@latest` (needs Go) or a prebuilt binary from goose's [releases page](https://github.com/pressly/goose/releases) (doesn't).
+
+Both scenarios share the same first steps:
 
 ```
-cp env.example .env      # fill in POSTGRES_*, HTTP_SERVER_ADDRESS, etc.
-docker-compose up -d     # starts PostgreSQL
-make migrate-up          # applies migrations
-make run                 # starts the API + background worker
+git clone https://github.com/spenderella/currency-quotes-service.git
+cd currency-quotes-service
+cp env.example .env             # fill in POSTGRES_*, HTTP_SERVER_ADDRESS=:8080, etc.
+docker-compose up -d postgres   # start PostgreSQL
+make migrate-up                 # apply migrations
 ```
 
-The server listens on `HTTP_SERVER_ADDRESS` (from `.env`); `GET /health` is a plain liveness check.
+`.env` is read by the app as an actual file at startup (via `godotenv`), not just from the process environment — it's gitignored and never baked into any image, only ever bind-mounted or read straight off disk.
+
+### 1. Developing
+
+```
+make run   # go run cmd/server/main.go — fastest feedback loop, no image build/rebuild per change
+```
+
+#### Publishing a new image
+
+Once a change is ready to ship, bump the version in `docker-compose.yaml`'s `app.image` (e.g. `1.0.0` → `1.0.1`). GHCR doesn't enforce immutable tags, so re-pushing an already-published version would silently overwrite it. Then build and push:
+
+```
+docker compose build app
+docker compose push app
+```
+
+### 2. Just running the service
+
+No Go toolchain needed — the app runs from the pre-built image in the registry instead of building locally.
+
+```
+docker compose pull app   # fetch the pre-built image (bypasses the local Dockerfile build)
+docker-compose up -d      # bring up the app too, now that the schema exists
+```
 
 ## API
 
