@@ -5,6 +5,48 @@ Supported currencies: CAD, EUR, GBP, MXN, USD.
 
 The service provides quotes with a precision of 6 decimal places.
 
+## Running the project
+
+Prerequisites: Go 1.25+, Docker (for PostgreSQL), and the [goose](https://github.com/pressly/goose) CLI for migrations (`go install github.com/pressly/goose/v3/cmd/goose@latest`).
+
+```
+cp env.example .env      # fill in POSTGRES_*, HTTP_SERVER_ADDRESS, etc.
+docker-compose up -d     # starts PostgreSQL
+make migrate-up          # applies migrations
+make run                 # starts the API + background worker
+```
+
+The server listens on `HTTP_SERVER_ADDRESS` (from `.env`); `GET /health` is a plain liveness check.
+
+## API
+
+All endpoints are JSON. Non-2xx responses have the shape `{"error": "..."}`.
+
+**`POST /quotes`** — request a quote update. Runs in the background; the handler doesn't wait on the provider. Requires a client-generated `Idempotency-Key` header — replaying the same key returns the same update instead of creating a duplicate.
+
+```
+curl -X POST localhost:8080/quotes \
+  -H 'Idempotency-Key: 3b1f6e9a-...' \
+  -H 'Content-Type: application/json' \
+  -d '{"base_currency": "EUR", "quote_currency": "MXN"}'
+# 202 {"id": "..."}
+```
+
+**`GET /quotes/{id}`** — fetch an update by ID, in whatever status it's currently in (`pending`/`in_progress`/`done`/`failed`). `rate`/`provider_time`/`fetched_at` are only present once the update is `done`.
+
+```
+curl localhost:8080/quotes/3b1f6e9a-...
+# 200 {"id": "...", "base_currency": "EUR", "quote_currency": "MXN", "status": "done", "rate": "21.5", "provider_time": "...", "fetched_at": "..."}
+```
+
+**`GET /quotes/latest?base=EUR&quote=MXN`** — the most recent successfully completed (`done`) update for a currency pair. `404` if none exists yet.
+
+```
+curl 'localhost:8080/quotes/latest?base=EUR&quote=MXN'
+```
+
+`404` is also returned by `GET /quotes/{id}` for an unknown ID; `422` is returned by both `POST /quotes` and `GET /quotes/latest` for a currency outside the supported whitelist.
+
 ## Rate provider
 
 Rates are sourced from Banco de México (Banxico) reference rates via [Frankfurter](https://frankfurter.dev) (`providers=BANXICO`). Central bank reference rates are published once per business day, so rates only actually change on that cadence regardless of how often an update is requested. `RatesProvider` is defined as an interface, so a different provider can be swapped in if a task needs more frequent updates or coverage from another source.

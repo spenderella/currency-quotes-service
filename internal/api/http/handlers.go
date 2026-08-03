@@ -15,6 +15,8 @@ import (
 
 const maxRequestBodyBytes = 1 << 20 // 1 MiB
 
+const maxIdempotencyKeyLength = 255
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
@@ -24,8 +26,8 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // provider happens in the background worker.
 func (s *Server) createQuoteHandler(w http.ResponseWriter, r *http.Request) {
 	idempotencyKey := r.Header.Get("Idempotency-Key")
-	if idempotencyKey == "" {
-		writeError(w, http.StatusBadRequest, "Idempotency-Key header is required")
+	if err := validateIdempotencyKey(idempotencyKey); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -107,6 +109,16 @@ func (s *Server) handleServiceError(w http.ResponseWriter, r *http.Request, err 
 		s.logger.ErrorContext(r.Context(), "unhandled service error", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
+}
+
+func validateIdempotencyKey(key string) error {
+	if key == "" {
+		return errors.New("Idempotency-Key header is required")
+	}
+	if len(key) > maxIdempotencyKeyLength {
+		return fmt.Errorf("Idempotency-Key must not exceed %d characters", maxIdempotencyKeyLength)
+	}
+	return nil
 }
 
 func normalizeCurrencyCode(code string) (string, error) {

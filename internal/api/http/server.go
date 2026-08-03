@@ -39,7 +39,7 @@ func New(ctx context.Context, conf config.HTTPServerConfig, quoteService IQuoteS
 
 	server.httpServer = &http.Server{
 		Addr:         conf.Address,
-		Handler:      mux,
+		Handler:      loggingMiddleware(logger, mux),
 		ReadTimeout:  time.Duration(conf.ReadTimeoutSeconds) * time.Second,
 		WriteTimeout: time.Duration(conf.WriteTimeoutSeconds) * time.Second,
 	}
