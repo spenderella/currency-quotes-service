@@ -106,12 +106,18 @@ func (s *QuoteService) RecoverPendingUpdates(ctx context.Context) ([]domain.Quot
 	return s.quoteRepo.GetUndoneQuoteUpdates(ctx)
 }
 
+// markFailedTimeout bounds the MarkFailed write on its own, independent of
+// how much of the task's own deadline is left.
+const markFailedTimeout = 5 * time.Second
+
 // ProcessClaimedTask resolves an already-claimed task: fetches the rate from
 // the provider and persists the result.
 func (s *QuoteService) ProcessClaimedTask(ctx context.Context, task domain.Quote) error {
 	rate, providerTime, err := s.provider.GetRate(ctx, task.BaseCurrency, task.QuoteCurrency)
 	if err != nil {
-		if markErr := s.quoteRepo.MarkFailed(ctx, task.ID, err.Error()); markErr != nil {
+		markCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), markFailedTimeout)
+		defer cancel()
+		if markErr := s.quoteRepo.MarkFailed(markCtx, task.ID, err.Error()); markErr != nil {
 			return errors.Join(fmt.Errorf("get rate: %w", err), markErr)
 		}
 		return fmt.Errorf("get rate: %w", err)

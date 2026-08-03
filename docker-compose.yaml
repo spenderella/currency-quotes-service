@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/spenderella/currency-quotes-service:1.0.0
+    image: ghcr.io/spenderella/currency-quotes-service:1.0.1
     build: .
     container_name: currency_quotes_app
     depends_on:

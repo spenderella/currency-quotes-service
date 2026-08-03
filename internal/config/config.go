@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -26,7 +27,7 @@ type HTTPServerConfig struct {
 type WorkerConfig struct {
 	PoolSize            int  `env:"WORKER_POOL_SIZE" envDefault:"4"`
 	TickIntervalSeconds uint `env:"WORKER_TICK_INTERVAL_SECONDS" envDefault:"5"`
-	TaskTimeoutSeconds  uint `env:"WORKER_TASK_TIMEOUT_SECONDS" envDefault:"10"`
+	TaskTimeoutSeconds  uint `env:"WORKER_TASK_TIMEOUT_SECONDS" envDefault:"20"`
 }
 
 type PostgresConfig struct {
@@ -123,5 +124,30 @@ func (c *Configuration) validate() error {
 		errs = append(errs, errors.New("provider: PROVIDER_RETRY_BASE_DELAY_MS must be > 0"))
 	}
 
+	if c.Worker.TaskTimeoutSeconds > 0 && c.Provider.TimeoutSeconds > 0 && c.Provider.MaxRetries > 0 {
+		taskTimeout := time.Duration(c.Worker.TaskTimeoutSeconds) * time.Second
+		worstCaseRetry := c.Provider.worstCaseRetryDuration()
+		if taskTimeout <= worstCaseRetry {
+			errs = append(errs, fmt.Errorf(
+				"worker: WORKER_TASK_TIMEOUT_SECONDS (%s) must exceed the provider's worst-case retry duration (%s = %d attempts x PROVIDER_TIMEOUT_SECONDS + backoff) — otherwise the task's own deadline can expire mid-retry, and the resulting failure can't even be persisted",
+				taskTimeout, worstCaseRetry, c.Provider.MaxRetries,
+			))
+		}
+	}
+
 	return errors.Join(errs...)
+}
+
+// worstCaseRetryDuration is the longest GetRate can legitimately take: every
+// attempt uses the full per-call timeout, plus the backoff delay between
+// attempts (doubling from RetryBaseDelayMS, none after the last attempt).
+func (c ProviderConfig) worstCaseRetryDuration() time.Duration {
+	perAttempt := time.Duration(c.TimeoutSeconds) * time.Second
+	baseDelay := time.Duration(c.RetryBaseDelayMS) * time.Millisecond
+
+	total := time.Duration(c.MaxRetries) * perAttempt
+	for attempt := range c.MaxRetries - 1 {
+		total += baseDelay << attempt
+	}
+	return total
 }
