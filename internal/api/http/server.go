@@ -8,28 +8,38 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/spenderella/currency-quotes-service/internal/config"
+	"github.com/spenderella/currency-quotes-service/internal/domain"
 )
 
+// IQuoteService is the subset of *service.QuoteService the HTTP layer depends on.
+type IQuoteService interface {
+	CreateQuoteUpdate(ctx context.Context, baseCurrency, quoteCurrency, idempotencyKey string) (uuid.UUID, error)
+	GetQuoteUpdateByID(ctx context.Context, id uuid.UUID) (domain.Quote, error)
+	GetQuoteUpdateLatest(ctx context.Context, baseCurrency, quoteCurrency string) (domain.Quote, error)
+}
+
 type Server struct {
-	httpServer *http.Server
-	logger     *slog.Logger
+	httpServer   *http.Server
+	logger       *slog.Logger
+	quoteService IQuoteService
 }
 
 // New initializes the HTTP server, router, and all dependencies
-func New(ctx context.Context, conf config.HTTPServerConfig, logger *slog.Logger) (*Server, error) {
+func New(ctx context.Context, conf config.HTTPServerConfig, quoteService IQuoteService, logger *slog.Logger) (*Server, error) {
+	server := Server{logger: logger, quoteService: quoteService}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
-	mux.HandleFunc("POST /quotes", createQuoteHandler)
-	mux.HandleFunc("GET /quotes/{id}", getQuoteByIDHandler)
-	mux.HandleFunc("GET /quotes/latest", getLatestQuoteHandler)
-
-	server := Server{logger: logger}
+	mux.HandleFunc("POST /quotes", server.createQuoteHandler)
+	mux.HandleFunc("GET /quotes/{id}", server.getQuoteByIDHandler)
+	mux.HandleFunc("GET /quotes/latest", server.getLatestQuoteHandler)
 
 	server.httpServer = &http.Server{
 		Addr:         conf.Address,
-		Handler:      mux,
+		Handler:      loggingMiddleware(logger, mux),
 		ReadTimeout:  time.Duration(conf.ReadTimeoutSeconds) * time.Second,
 		WriteTimeout: time.Duration(conf.WriteTimeoutSeconds) * time.Second,
 	}
